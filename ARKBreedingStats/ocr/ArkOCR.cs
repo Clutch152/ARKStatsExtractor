@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -21,6 +21,7 @@ namespace ARKBreedingStats
         private static ocr.OCRControl ocrControl;
         public Dictionary<string, Point> lastLetterPositions = new Dictionary<string, Point>();
         public string screenCaptureApplicationName;
+        private int pID = 0;
         public Process ScreenCaptureProcess;
         public int waitBeforeScreenCapture;
         public bool enableOutput = false;
@@ -43,14 +44,17 @@ namespace ARKBreedingStats
 
             Process[] p = Process.GetProcessesByName(screenCaptureApplicationName);
             if (p.Length > 0)
+            {
+                MessageBox.Show("Multiple Processes found with the name " + screenCaptureApplicationName);
                 ScreenCaptureProcess = p[0];
+            }
 
             waitBeforeScreenCapture = 500;
         }
 
         public bool setResolution()
         {
-            return setResolution(Win32Stuff.GetSreenshotOfProcess(screenCaptureApplicationName, waitBeforeScreenCapture));
+            return setResolution(Win32Stuff.GetSreenshotOfProcess(screenCaptureApplicationName, waitBeforeScreenCapture, ref pID));
         }
 
         // figure out the current resolution and positions
@@ -481,7 +485,7 @@ namespace ARKBreedingStats
             else
             {
                 // grab screenshot from ark
-                screenshotbmp = Win32Stuff.GetSreenshotOfProcess(screenCaptureApplicationName, waitBeforeScreenCapture, true);
+                screenshotbmp = Win32Stuff.GetSreenshotOfProcess(screenCaptureApplicationName, waitBeforeScreenCapture, ref pID, true);
             }
             if (screenshotbmp == null)
             {
@@ -1021,7 +1025,7 @@ namespace ARKBreedingStats
             if (Win32Stuff.GetForegroundWindow() != ScreenCaptureProcess.MainWindowHandle)
                 return false;
 
-            screenshotbmp = Win32Stuff.GetSreenshotOfProcess(screenCaptureApplicationName, waitBeforeScreenCapture);
+            screenshotbmp = Win32Stuff.GetSreenshotOfProcess(screenCaptureApplicationName, waitBeforeScreenCapture, ref pID);
 
             if (screenshotbmp == null)
                 return false;
