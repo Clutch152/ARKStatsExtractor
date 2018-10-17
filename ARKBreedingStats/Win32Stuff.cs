@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -37,6 +37,9 @@ namespace ARKBreedingStats
         [DllImport("user32.dll")]
         public static extern IntPtr GetForegroundWindow();
 
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetWindowThreadProcessId(IntPtr hWnd, out uint ProcessId);
+
         public struct Rect
         {
             public int left;
@@ -60,34 +63,75 @@ namespace ARKBreedingStats
             public int y;
         }
 
-        public static Bitmap GetSreenshotOfProcess(string processName, int waitMs, bool hideOverlay = false)// = 500)
+        public static Bitmap GetSreenshotOfProcess(string processName, int waitMs, ref int pID, bool hideOverlay = false)// = 500)
         {
-	        Process[] p = Process.GetProcessesByName(processName);
-	        Bitmap grab = null;
+            Process[] p = Process.GetProcessesByName(processName);
+            Bitmap grab = null;
 
-	        if (p.Length == 0)
-	        	return null;
+            if (pID == 0)
+            {
+                //No processID was given.
 
-	        //Shadow Box users have multiple processes named "Shadow" but only one has an actual window.
-	        //Itterate through processes until window screen grab is NOT null.
-	        foreach (Process i in p)
-	        {
+                if (p.Length > 1 || p.Length == 0)
+                {
+                    //Multiple or no Processes Found. Prompt to select window by bringing it to foreground.
+                    DialogResult r = MessageBox.Show("Multiple or no processes found! Please select your desired window. NOTE: Once selected, restart this application to change windows.", "Choose Window", MessageBoxButtons.OKCancel);
 
-	        	IntPtr proc = i.MainWindowHandle;
-	        	//return PrintWindow(proc); <-- doesn't work, althought it should
+                    if (r == DialogResult.Cancel)
+                        return null;
 
-	        	SetForegroundWindow(proc);
-	        	ShowWindow(proc, SW_RESTORE);
 
-	        	// You need some amount of delay, but 1 second may be overkill
-	        	Thread.Sleep(waitMs);
+                    //Grab Next Foreground Window.
 
-	        	grab = GrabCurrentScreen(proc, hideOverlay);
+                    IntPtr self = GetForegroundWindow(); //Grab self
+                    IntPtr window = GetForegroundWindow(); //Window to compare to
+                    while (true)
+                    {
+                        Thread.Sleep(10); //Avoid looping to fast (Loop of DOOM!)
+                        window = GetForegroundWindow();
 
-	        	if (grab != null)
-	        		break;
-	        }
-	        return grab;
+                        if (self == window) //Check to see if new window is different from self.
+                            continue;
+
+                        DialogResult n = MessageBox.Show("New window selection detected! Would you like to use this?", "Window Selection", MessageBoxButtons.YesNoCancel);
+
+                        if (n == DialogResult.No)
+                            continue;
+                        else if (n == DialogResult.Cancel)
+                            return null;
+                        else
+                        {
+                            uint tpID;
+                            GetWindowThreadProcessId(window, out tpID);
+
+                            pID = (int)tpID;
+                            break;
+                        }
+                    }
+                }
+                else
+                    pID = p[0].Id;
+
+                p = new Process[] { Process.GetProcessById(pID) };
+            }
+            else
+                p = new Process[] { Process.GetProcessById(pID) };
+
+            if (p.Length == 0)
+                return null; //Still Couldn't get process ...
+
+            IntPtr proc = p[0].MainWindowHandle;
+            //return PrintWindow(proc); <-- doesn't work, althought it should
+
+            SetForegroundWindow(proc);
+            ShowWindow(proc, SW_RESTORE);
+
+            // You need some amount of delay, but 1 second may be overkill
+            Thread.Sleep(waitMs);
+
+            grab = GrabCurrentScreen(proc, hideOverlay);
+
+            return grab;
         }
 
         public static Rect GetWindowRect(string processName)
